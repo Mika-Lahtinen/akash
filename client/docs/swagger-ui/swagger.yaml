@@ -221,11 +221,13 @@ paths:
                                           enum:
                                             - SHARED_HTTP
                                             - RANDOM_PORT
+                                            - LEASED_IP
                                           default: SHARED_HTTP
                                           description: >-
                                             - SHARED_HTTP: Describes an endpoint
                                             that becomes a Kubernetes Ingress
                                              - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                             - LEASED_IP: Describes an endpoint that becomes a leased IP
                                           title: >-
                                             This describes how the endpoint is
                                             implemented when the lease is deployed
@@ -621,11 +623,13 @@ paths:
                                                 enum:
                                                   - SHARED_HTTP
                                                   - RANDOM_PORT
+                                                  - LEASED_IP
                                                 default: SHARED_HTTP
                                                 description: >-
                                                   - SHARED_HTTP: Describes an endpoint
                                                   that becomes a Kubernetes Ingress
                                                    - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                                   - LEASED_IP: Describes an endpoint that becomes a leased IP
                                                 title: >-
                                                   This describes how the endpoint is
                                                   implemented when the lease is deployed
@@ -1069,11 +1073,13 @@ paths:
                                         enum:
                                           - SHARED_HTTP
                                           - RANDOM_PORT
+                                          - LEASED_IP
                                         default: SHARED_HTTP
                                         description: >-
                                           - SHARED_HTTP: Describes an endpoint
                                           that becomes a Kubernetes Ingress
                                            - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                           - LEASED_IP: Describes an endpoint that becomes a leased IP
                                         title: >-
                                           This describes how the endpoint is
                                           implemented when the lease is deployed
@@ -1735,6 +1741,9 @@ paths:
                   created_at:
                     type: string
                     format: int64
+                  closed_on:
+                    type: string
+                    format: int64
                 title: Lease stores LeaseID, state of lease and price
               escrow_payment:
                 type: object
@@ -1930,6 +1939,9 @@ paths:
 
                             signatures required by gogoproto.
                         created_at:
+                          type: string
+                          format: int64
+                        closed_on:
                           type: string
                           format: int64
                       title: Lease stores LeaseID, state of lease and price
@@ -2332,11 +2344,13 @@ paths:
                                         enum:
                                           - SHARED_HTTP
                                           - RANDOM_PORT
+                                          - LEASED_IP
                                         default: SHARED_HTTP
                                         description: >-
                                           - SHARED_HTTP: Describes an endpoint
                                           that becomes a Kubernetes Ingress
                                            - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                           - LEASED_IP: Describes an endpoint that becomes a leased IP
                                         title: >-
                                           This describes how the endpoint is
                                           implemented when the lease is deployed
@@ -2605,11 +2619,13 @@ paths:
                                           enum:
                                             - SHARED_HTTP
                                             - RANDOM_PORT
+                                            - LEASED_IP
                                           default: SHARED_HTTP
                                           description: >-
                                             - SHARED_HTTP: Describes an endpoint
                                             that becomes a Kubernetes Ingress
                                              - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                             - LEASED_IP: Describes an endpoint that becomes a leased IP
                                           title: >-
                                             This describes how the endpoint is
                                             implemented when the lease is deployed
@@ -26448,10 +26464,12 @@ definitions:
         enum:
           - SHARED_HTTP
           - RANDOM_PORT
+          - LEASED_IP
         default: SHARED_HTTP
         description: |-
           - SHARED_HTTP: Describes an endpoint that becomes a Kubernetes Ingress
            - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+           - LEASED_IP: Describes an endpoint that becomes a leased IP
         title: >-
           This describes how the endpoint is implemented when the lease is
           deployed
@@ -26461,10 +26479,12 @@ definitions:
     enum:
       - SHARED_HTTP
       - RANDOM_PORT
+      - LEASED_IP
     default: SHARED_HTTP
     description: |-
       - SHARED_HTTP: Describes an endpoint that becomes a Kubernetes Ingress
        - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+       - LEASED_IP: Describes an endpoint that becomes a leased IP
     title: This describes how the endpoint is implemented when the lease is deployed
   akash.base.v1beta2.Memory:
     type: object
@@ -26598,11 +26618,13 @@ definitions:
               enum:
                 - SHARED_HTTP
                 - RANDOM_PORT
+                - LEASED_IP
               default: SHARED_HTTP
               description: >-
                 - SHARED_HTTP: Describes an endpoint that becomes a Kubernetes
                 Ingress
                  - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                 - LEASED_IP: Describes an endpoint that becomes a leased IP
               title: >-
                 This describes how the endpoint is implemented when the lease is
                 deployed
@@ -26890,11 +26912,13 @@ definitions:
                             enum:
                               - SHARED_HTTP
                               - RANDOM_PORT
+                              - LEASED_IP
                             default: SHARED_HTTP
                             description: >-
                               - SHARED_HTTP: Describes an endpoint that becomes
                               a Kubernetes Ingress
                                - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                               - LEASED_IP: Describes an endpoint that becomes a leased IP
                             title: >-
                               This describes how the endpoint is implemented
                               when the lease is deployed
@@ -27079,11 +27103,13 @@ definitions:
                         enum:
                           - SHARED_HTTP
                           - RANDOM_PORT
+                          - LEASED_IP
                         default: SHARED_HTTP
                         description: >-
                           - SHARED_HTTP: Describes an endpoint that becomes a
                           Kubernetes Ingress
                            - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                           - LEASED_IP: Describes an endpoint that becomes a leased IP
                         title: >-
                           This describes how the endpoint is implemented when
                           the lease is deployed
@@ -27319,11 +27345,13 @@ definitions:
                                   enum:
                                     - SHARED_HTTP
                                     - RANDOM_PORT
+                                    - LEASED_IP
                                   default: SHARED_HTTP
                                   description: >-
                                     - SHARED_HTTP: Describes an endpoint that
                                     becomes a Kubernetes Ingress
                                      - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                     - LEASED_IP: Describes an endpoint that becomes a leased IP
                                   title: >-
                                     This describes how the endpoint is
                                     implemented when the lease is deployed
@@ -27669,11 +27697,13 @@ definitions:
                                         enum:
                                           - SHARED_HTTP
                                           - RANDOM_PORT
+                                          - LEASED_IP
                                         default: SHARED_HTTP
                                         description: >-
                                           - SHARED_HTTP: Describes an endpoint
                                           that becomes a Kubernetes Ingress
                                            - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                           - LEASED_IP: Describes an endpoint that becomes a leased IP
                                         title: >-
                                           This describes how the endpoint is
                                           implemented when the lease is deployed
@@ -28007,11 +28037,13 @@ definitions:
                                 enum:
                                   - SHARED_HTTP
                                   - RANDOM_PORT
+                                  - LEASED_IP
                                 default: SHARED_HTTP
                                 description: >-
                                   - SHARED_HTTP: Describes an endpoint that
                                   becomes a Kubernetes Ingress
                                    - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                   - LEASED_IP: Describes an endpoint that becomes a leased IP
                                 title: >-
                                   This describes how the endpoint is implemented
                                   when the lease is deployed
@@ -28133,11 +28165,13 @@ definitions:
                   enum:
                     - SHARED_HTTP
                     - RANDOM_PORT
+                    - LEASED_IP
                   default: SHARED_HTTP
                   description: >-
                     - SHARED_HTTP: Describes an endpoint that becomes a
                     Kubernetes Ingress
                      - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                     - LEASED_IP: Describes an endpoint that becomes a leased IP
                   title: >-
                     This describes how the endpoint is implemented when the
                     lease is deployed
@@ -28922,6 +28956,9 @@ definitions:
       created_at:
         type: string
         format: int64
+      closed_on:
+        type: string
+        format: int64
     title: Lease stores LeaseID, state of lease and price
   akash.market.v1beta2.Lease.State:
     type: string
@@ -29131,11 +29168,13 @@ definitions:
                             enum:
                               - SHARED_HTTP
                               - RANDOM_PORT
+                              - LEASED_IP
                             default: SHARED_HTTP
                             description: >-
                               - SHARED_HTTP: Describes an endpoint that becomes
                               a Kubernetes Ingress
                                - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                               - LEASED_IP: Describes an endpoint that becomes a leased IP
                             title: >-
                               This describes how the endpoint is implemented
                               when the lease is deployed
@@ -29614,6 +29653,9 @@ definitions:
           created_at:
             type: string
             format: int64
+          closed_on:
+            type: string
+            format: int64
         title: Lease stores LeaseID, state of lease and price
       escrow_payment:
         type: object
@@ -29752,6 +29794,9 @@ definitions:
 
                     signatures required by gogoproto.
                 created_at:
+                  type: string
+                  format: int64
+                closed_on:
                   type: string
                   format: int64
               title: Lease stores LeaseID, state of lease and price
@@ -30027,11 +30072,13 @@ definitions:
                                 enum:
                                   - SHARED_HTTP
                                   - RANDOM_PORT
+                                  - LEASED_IP
                                 default: SHARED_HTTP
                                 description: >-
                                   - SHARED_HTTP: Describes an endpoint that
                                   becomes a Kubernetes Ingress
                                    - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                   - LEASED_IP: Describes an endpoint that becomes a leased IP
                                 title: >-
                                   This describes how the endpoint is implemented
                                   when the lease is deployed
@@ -30241,11 +30288,13 @@ definitions:
                                   enum:
                                     - SHARED_HTTP
                                     - RANDOM_PORT
+                                    - LEASED_IP
                                   default: SHARED_HTTP
                                   description: >-
                                     - SHARED_HTTP: Describes an endpoint that
                                     becomes a Kubernetes Ingress
                                      - RANDOM_PORT: Describes an endpoint that becomes a Kubernetes NodePort
+                                     - LEASED_IP: Describes an endpoint that becomes a leased IP
                                   title: >-
                                     This describes how the endpoint is
                                     implemented when the lease is deployed
