@@ -35,6 +35,7 @@ PROVIDER_ENDPOINT ?= http://$(PROVIDER_HOST)
 INGRESS_CONFIG_PATH ?= ../ingress-nginx.yaml
 INGRESS_CLASS_CONFIG_PATH ?= ../ingress-nginx-class.yaml
 CALICO_MANIFEST     ?= https://docs.projectcalico.org/v3.8/manifests/calico.yaml
+METALLB_CONFIG_PATH ?= ../metallb.yaml
 
 .PHONY: app-http-port
 app-http-port:
@@ -66,6 +67,7 @@ kind-cluster-create: $(KIND)
 		--image "$(KIND_IMG)"
 	kubectl label nodes $(KIND_NAME)-control-plane akash.network/role=ingress
 	kubectl apply -f "$(INGRESS_CONFIG_PATH)"
+	kubectl apply -f "$(METALLB_CONFIG_PATH)"
 	kubectl apply -f "$(INGRESS_CLASS_CONFIG_PATH)"
 	"$(AKASH_ROOT)/script/setup-kind.sh"
 
@@ -79,6 +81,7 @@ kind-cluster-calico-create: $(KIND)
 	kubectl -n kube-system set env daemonset/calico-node FELIX_IGNORELOOSERPF=true
 	# Calico needs to be managing networking before finishing setup
 	kubectl apply -f "$(INGRESS_CONFIG_PATH)"
+	kubectl apply -f "$(METALLB_CONFIG_PATH)"
 	$(AKASH_ROOT)/script/setup-kind.sh calico-metrics
 
 .PHONY: kind-ingress-setup
@@ -86,6 +89,7 @@ kind-ingress-setup:
 	kubectl label nodes $(KIND_NAME)-control-plane akash.network/role=ingress
 	kubectl apply -f "$(INGRESS_CONFIG_PATH)"
 	kubectl apply -f "$(INGRESS_CLASS_CONFIG_PATH)"
+	kubectl apply -f "$(METALLB_CONFIG_PATH)"
 	"$(AKASH_ROOT)/script/setup-kind.sh"
 
 

@@ -419,6 +419,7 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 	}
 
 	dm.log.Debug("processing ip directives", "cnt", len(leasedIPs))
+	// TODO - stable sort serviceExpose by service name and port number
 	for _, serviceExpose := range leasedIPs {
 		portKey := fmt.Sprintf("%v-%v", serviceExpose.expose.Proto, clusterutil.ExposeExternalPort(serviceExpose.expose))
 

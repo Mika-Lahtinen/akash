@@ -59,6 +59,7 @@ type ReadClient interface {
 	GetHostnameDeploymentConnections(ctx context.Context) ([]ctypes.LeaseIDHostnameConnection, error)
 
 	ObserveIPState(ctx context.Context) (<- chan ctypes.IPResourceEvent, error)
+	//GetIPState(ctx context.Context) ([]ctypes.)
 }
 
 // Client interface lease and deployment methods
@@ -588,5 +589,9 @@ func (c* nullClient) ObserveIPState(ctx context.Context) (<- chan ctypes.IPResou
 }
 
 func (c *nullClient) CreateIPPassthrough(ctx context.Context, lID mtypes.LeaseID, directive ctypes.ClusterIPPassthroughDirective) error {
+	return errNotImplemented
+}
+
+func (c *nullClient) PurgeIPPassthrough(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32) error {
 	return errNotImplemented
 }

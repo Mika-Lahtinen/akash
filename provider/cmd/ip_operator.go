@@ -31,14 +31,14 @@ type ipOperator struct {
 }
 
 func (op *ipOperator) run(parentCtx context.Context) error {
-	op.log.Debug("hostname operator start")
+	op.log.Debug("ip operator start")
 	const threshold = 3 * time.Second
 
 	for {
 		lastAttempt := time.Now()
 		err := op.monitorUntilError(parentCtx)
 		if errors.Is(err, context.Canceled) {
-			op.log.Debug("hostname operator terminate")
+			op.log.Debug("ip operator terminate")
 			return err
 		}
 
@@ -63,29 +63,17 @@ func (op *ipOperator) monitorUntilError(parentCtx context.Context) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	op.log.Info("starting observation")
 
-	connections, err := op.client.GetHostnameDeploymentConnections(ctx)
+	/**
+	ipServices, err := op.client.GetIPState(ctx)
 	if err != nil {
 		cancel()
 		return err
 	}
 
-	for _, conn := range connections {
-		leaseID := conn.GetLeaseID()
-		hostname := conn.GetHostname()
-		entry := managedHostname{
-			lastEvent:           nil,
-			presentLease:        leaseID,
-			presentServiceName:  conn.GetServiceName(),
-			presentExternalPort: uint32(conn.GetExternalPort()),
-		}
-
-		op.hostnames[hostname] = entry
-		op.log.Debug("identified existing hostname connection",
-			"hostname", hostname,
-			"lease", entry.presentLease,
-			"service", entry.presentServiceName,
-			"port", entry.presentExternalPort)
+	for _, conn := range ipServices {
+		// TODO - update op.state with each entry
 	}
+	 */
 
 	events, err := op.client.ObserveIPState(ctx)
 	if err != nil {
@@ -116,7 +104,7 @@ loop:
 	}
 
 	cancel()
-	op.log.Debug("hostname operator done")
+	op.log.Debug("ip operator done")
 	return exitError
 }
 
@@ -184,11 +172,11 @@ func (op *ipOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes.IPRes
 
 		if !exists {
 			shouldConnect = true
-			op.log.Debug("hostname target is new, applying")
+			op.log.Debug("ip passthrough is new, applying")
 			// Check to see if port or service name is different
 		} else if entry.presentServiceName != ev.GetServiceName() {
 			shouldConnect = true
-			op.log.Debug("hostname target has changed, applying")
+			op.log.Debug("ip passthrough has changed, applying")
 		}
 
 		if shouldConnect {
@@ -226,11 +214,12 @@ func doIPOperator(cmd *cobra.Command) error {
 		return err
 	}
 
-	op := hostnameOperator{
-		hostnames: make(map[string]managedHostname),
-		client:    client,
-		log:       logger,
+	op := ipOperator{
+		state:  make(map[string]managedIp),
+		client: client,
+		log:    logger,
 	}
+
 
 	return op.run(cmd.Context())
 }
