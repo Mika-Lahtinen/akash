@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/ovrclk/akash/manifest"
 	akashtypes "github.com/ovrclk/akash/pkg/apis/akash.network/v1"
 	"github.com/ovrclk/akash/provider/cluster/kube/builder"
 	mtypes "github.com/ovrclk/akash/x/market/types/v1beta2"
@@ -12,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (c *client) DeclareIP(ctx context.Context, lID mtypes.LeaseID,  serviceName string, externalPort uint32, sharingKey string) error {
+func (c *client) DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error {
 	h := sha256.New()
 	_, err := io.WriteString(h, lID.String())
 	if err != nil {

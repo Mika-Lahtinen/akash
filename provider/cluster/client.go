@@ -89,7 +89,7 @@ type Client interface {
 
 	PurgeDeclaredHostname(ctx context.Context, lID mtypes.LeaseID, hostname string) error
 
-	DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, sharingKey string) error
+	DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error
 }
 
 func ErrorIsOkToSendToClient(err error) bool {
@@ -569,6 +569,6 @@ func (c *nullClient) AllHostnames(context.Context) ([]ctypes.ActiveHostname, err
 	return nil, nil
 }
 
-func (c *nullClient) DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, sharingKey string) error {
+func (c *nullClient) DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error {
 	return errNotImplemented
 }

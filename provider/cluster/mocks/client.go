@@ -76,6 +76,20 @@ func (_m *Client) DeclareHostname(ctx context.Context, lID v1beta2.LeaseID, host
 	return r0
 }
 
+// DeclareIP provides a mock function with given fields: ctx, lID, serviceName, externalPort, proto, sharingKey
+func (_m *Client) DeclareIP(ctx context.Context, lID v1beta2.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error {
+	ret := _m.Called(ctx, lID, serviceName, externalPort, proto, sharingKey)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, v1beta2.LeaseID, string, uint32, manifest.ServiceProtocol, string) error); ok {
+		r0 = rf(ctx, lID, serviceName, externalPort, proto, sharingKey)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Deploy provides a mock function with given fields: ctx, lID, mgroup
 func (_m *Client) Deploy(ctx context.Context, lID v1beta2.LeaseID, mgroup *manifest.Group) error {
 	ret := _m.Called(ctx, lID, mgroup)

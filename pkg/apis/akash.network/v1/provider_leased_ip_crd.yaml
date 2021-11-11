@@ -39,6 +39,8 @@ spec:
                   type: string
                 external_port:
                   type: integer
+                protocol:
+                  type: string
                 sharing_key:
                   type: string
 

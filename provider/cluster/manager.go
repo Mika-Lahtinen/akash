@@ -2,7 +2,12 @@ package cluster
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base32"
 	"fmt"
+	"io"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -379,7 +384,7 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 				}
 			}
 
-			if expose.IP {
+			if len(expose.IP) != 0 {
 				leasedIPs = append(leasedIPs, expose)
 			}
 		}
@@ -402,36 +407,25 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 		}
 	}
 
-	const ipLimit = 100
 	allocatedIPs := make(map[string][]manifest.ServiceExpose)
-	usedPorts := make(map[string]map[string]manifest.ServiceExpose, ipLimit)
-	makeIPSharingLKey := func(lID mtypes.LeaseID, i int) string {
-		return fmt.Sprintf("%s-ip-%d", lID.String(), i)
-	}
-	for i := 0; i != ipLimit; i++ {
-		sharingKey := makeIPSharingLKey(dm.lease, i)
-		usedPorts[sharingKey] = make(map[string]manifest.ServiceExpose)
+	makeIPSharingLKey := func(lID mtypes.LeaseID, name string) string {
+		allowedRegex := regexp.MustCompile(`[a-z,0-9,\-]+`)
+		effectiveName := name
+		if !allowedRegex.MatchString(name) {
+			h := sha256.New()
+			_, err = io.WriteString(h, name)
+			if err != nil {
+				panic(err)
+			}
+			effectiveName = strings.ToLower(base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(h.Sum(nil)[0:15]))
+		}
+		return fmt.Sprintf("%s-ip-%q", lID.String(), effectiveName)
 	}
 
 	for _, serviceExpose := range leasedIPs {
-		portKey := fmt.Sprintf("%v-%v", serviceExpose.Proto, clusterutil.ExposeExternalPort(serviceExpose))
+		endpointName := serviceExpose.IP
 
-		selectedIPIndex := -1
-		for i := 0; i != ipLimit; i++ {
-			sharingKey := makeIPSharingLKey(dm.lease, i)
-			_, inUse := usedPorts[sharingKey][portKey]
-			if !inUse {
-				selectedIPIndex = i
-			}
-		}
-
-		if selectedIPIndex == -1 {
-			// TODO - return an error here
-			panic("maxed out on IPs")
-		}
-
-		k := makeIPSharingLKey(dm.lease, selectedIPIndex)
-		usedPorts[k][portKey] = serviceExpose
+		k := makeIPSharingLKey(dm.lease, endpointName)
 
 		serviceExposeList := allocatedIPs[k]
 		serviceExposeList = append(serviceExposeList, serviceExpose)
@@ -441,7 +435,7 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 	for sharingKey, allocatedIP := range allocatedIPs {
 		for _, serviceExpose := range allocatedIP {
 			externalPort := clusterutil.ExposeExternalPort(serviceExpose)
-			err = dm.client.DeclareIP(ctx, dm.lease, serviceExpose.Service, uint32(externalPort), sharingKey)
+			err = dm.client.DeclareIP(ctx, dm.lease, serviceExpose.Service, uint32(externalPort), serviceExpose.Proto, sharingKey)
 		}
 	}
 	return withheldHostnames, nil
