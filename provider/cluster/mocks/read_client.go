@@ -185,6 +185,29 @@ func (_m *ReadClient) ObserveHostnameState(ctx context.Context) (<-chan cluster.
 	return r0, r1
 }
 
+// ObserveIPState provides a mock function with given fields: ctx
+func (_m *ReadClient) ObserveIPState(ctx context.Context) (<-chan cluster.IPResourceEvent, error) {
+	ret := _m.Called(ctx)
+
+	var r0 <-chan cluster.IPResourceEvent
+	if rf, ok := ret.Get(0).(func(context.Context) <-chan cluster.IPResourceEvent); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan cluster.IPResourceEvent)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ServiceStatus provides a mock function with given fields: _a0, _a1, _a2
 func (_m *ReadClient) ServiceStatus(_a0 context.Context, _a1 v1beta2.LeaseID, _a2 string) (*cluster.ServiceStatus, error) {
 	ret := _m.Called(_a0, _a1, _a2)

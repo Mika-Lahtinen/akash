@@ -454,13 +454,16 @@ func (sdl *v2) validate() error {
 				for _, to := range serviceExpose.To {
 					// Check to see if an IP endpoint is also specified
 					if len(to.IP) != 0 {
+						if to.Global {
+							return fmt.Errorf("%w: error on %q if an IP is declared the directive must be declared as global", errSDLInvalid, svcName)
+						}
 						endpoint, endpointExists := sdl.Endpoints[to.IP]
 						if !endpointExists {
-							return fmt.Errorf("%w: error on %q no endpoint named %q exists", errSDLInvalid, svcName, to.IP)
+							return fmt.Errorf("%w: error on service %q no endpoint named %q exists", errSDLInvalid, svcName, to.IP)
 						}
 
 						if endpoint.Kind != endpointKindIP {
-							return fmt.Errorf("%w: error on %q endpoint %q has type %q, should be %q", errSDLInvalid, svcName, to.IP, endpoint.Kind, endpointKindIP)
+							return fmt.Errorf("%w: error on service %q endpoint %q has type %q, should be %q", errSDLInvalid, svcName, to.IP, endpoint.Kind, endpointKindIP)
 						}
 
 						// Endpoint exists. Now check for port collisions across a single endpoint, port, & protocol

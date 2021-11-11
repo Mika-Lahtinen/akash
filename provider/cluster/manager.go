@@ -413,7 +413,6 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 		}
 	}
 
-	allocatedIPs := make(map[string][]serviceExposeWithServiceName)
 	makeIPSharingLKey := func(lID mtypes.LeaseID, name string) string {
 		allowedRegex := regexp.MustCompile(`[a-z,0-9,\-]+`)
 		effectiveName := name
@@ -431,24 +430,17 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 
 	for _, serviceExpose := range leasedIPs {
 		endpointName := serviceExpose.expose.IP
-		k := makeIPSharingLKey(dm.lease, endpointName)
-		serviceExposeList := allocatedIPs[k]
-		serviceExposeList = append(serviceExposeList, serviceExpose)
-		allocatedIPs[k] = serviceExposeList
-	}
+		sharingKey := makeIPSharingLKey(dm.lease, endpointName)
 
-	for sharingKey, allocatedIP := range allocatedIPs {
-		for _, serviceExpose := range allocatedIP {
+		externalPort := clusterutil.ExposeExternalPort(serviceExpose.expose)
+		err = dm.client.DeclareIP(ctx, dm.lease, serviceExpose.name, uint32(externalPort), serviceExpose.expose.Proto, sharingKey)
 
-			externalPort := clusterutil.ExposeExternalPort(serviceExpose.expose)
-			err = dm.client.DeclareIP(ctx, dm.lease, serviceExpose.name, uint32(externalPort), serviceExpose.expose.Proto, sharingKey)
-
-			if err != nil {
-				return withheldHostnames, err
-			}
-
+		if err != nil {
+			// TODO - on error undeclare IPs
+			return withheldHostnames, err
 		}
 	}
+
 	return withheldHostnames, nil
 }
 
