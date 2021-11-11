@@ -15,6 +15,7 @@ services:
           - hello.localhost
         to:
           - global: true
+            ip: true
   bew:
     image: quay.io/ovrclk/demo-app
     expose:

@@ -78,6 +78,7 @@ func (c *client) DeclareHostname(ctx context.Context, lID mtypes.LeaseID, host s
 	if exists {
 		_, err = c.ac.AkashV1().ProviderHosts(c.ns).Update(ctx, &obj, metav1.UpdateOptions{})
 	} else {
+		obj.ResourceVersion = ""
 		_, err = c.ac.AkashV1().ProviderHosts(c.ns).Create(ctx, &obj, metav1.CreateOptions{})
 	}
 	return err

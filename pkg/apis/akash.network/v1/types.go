@@ -44,7 +44,7 @@ type ManifestSpec struct {
 
 // Deployment returns the cluster.Deployment that the saved manifest represents.
 func (m Manifest) Deployment() (ctypes.Deployment, error) {
-	lid, err := m.Spec.LeaseID.toAkash()
+	lid, err := m.Spec.LeaseID.ToAkash()
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ type LeaseID struct {
 }
 
 // ToAkash returns LeaseID from LeaseID details
-func (id LeaseID) toAkash() (mtypes.LeaseID, error) {
+func (id LeaseID) ToAkash() (mtypes.LeaseID, error) {
 	owner, err := sdk.AccAddressFromBech32(id.Owner)
 	if err != nil {
 		return mtypes.LeaseID{}, err

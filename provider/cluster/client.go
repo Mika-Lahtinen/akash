@@ -57,6 +57,9 @@ type ReadClient interface {
 
 	ObserveHostnameState(ctx context.Context) (<-chan ctypes.HostnameResourceEvent, error)
 	GetHostnameDeploymentConnections(ctx context.Context) ([]ctypes.LeaseIDHostnameConnection, error)
+
+	ObserveIPState(ctx context.Context) (<- chan ctypes.IPResourceEvent, error)
+	//GetIPState(ctx context.Context) ([]ctypes.)
 }
 
 // Client interface lease and deployment methods
@@ -90,6 +93,11 @@ type Client interface {
 	PurgeDeclaredHostname(ctx context.Context, lID mtypes.LeaseID, hostname string) error
 
 	DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error
+    PurgeDeclaredIPs(ctx context.Context, lID mtypes.LeaseID) error
+
+	CreateIPPassthrough(ctx context.Context, lID mtypes.LeaseID, directive ctypes.ClusterIPPassthroughDirective) error
+	PurgeIPPassthrough(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32) error
+
 }
 
 func ErrorIsOkToSendToClient(err error) bool {
@@ -570,5 +578,21 @@ func (c *nullClient) AllHostnames(context.Context) ([]ctypes.ActiveHostname, err
 }
 
 func (c *nullClient) DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error {
+	return errNotImplemented
+}
+
+func (c* nullClient) PurgeDeclaredIPs(ctx context.Context, lID mtypes.LeaseID) error {
+	return errNotImplemented
+}
+
+func (c* nullClient) ObserveIPState(ctx context.Context) (<- chan ctypes.IPResourceEvent, error) {
+	return nil, errNotImplemented
+}
+
+func (c *nullClient) CreateIPPassthrough(ctx context.Context, lID mtypes.LeaseID, directive ctypes.ClusterIPPassthroughDirective) error {
+	return errNotImplemented
+}
+
+func (c *nullClient) PurgeIPPassthrough(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32) error {
 	return errNotImplemented
 }

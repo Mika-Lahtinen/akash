@@ -187,11 +187,12 @@ func buildDirective(ev ctypes.HostnameResourceEvent, serviceExpose crd.ManifestS
 	return directive
 }
 
-func (op *hostnameOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes.HostnameResourceEvent) error {
+func locateServiceFromManifest(ctx context.Context, client cluster.Client, leaseID mtypes.LeaseID, serviceName string, externalPort uint32) (crd.ManifestServiceExpose, error) {
+
 	// Locate the matchin service name & expose directive in the manifest CRD
-	found, manifestGroup, err := op.client.GetManifestGroup(ctx, ev.GetLeaseID())
+	found, manifestGroup, err := client.GetManifestGroup(ctx, leaseID)
 	if err != nil {
-		return err
+		return crd.ManifestServiceExpose{}, err
 	}
 	if !found {
 		/*
@@ -200,19 +201,19 @@ func (op *hostnameOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes
 			can be rewritten to watch for CRD events on the manifest as well, then avoid running this code
 			until the manifest exists.
 		*/
-		return fmt.Errorf("%w: no manifest found for %v", errObservationStopped, ev.GetLeaseID())
+		return crd.ManifestServiceExpose{}, fmt.Errorf("%w: no manifest found for %v", errObservationStopped, leaseID)
 	}
 
 	var selectedService crd.ManifestService
 	for _, service := range manifestGroup.Services {
-		if service.Name == ev.GetServiceName() {
+		if service.Name == serviceName {
 			selectedService = service
 			break
 		}
 	}
 
 	if selectedService.Count == 0 {
-		return fmt.Errorf("%w: no service found for %v - %v", errObservationStopped, ev.GetLeaseID(), ev.GetServiceName())
+		return crd.ManifestServiceExpose{}, fmt.Errorf("%w: no service found for %v - %v", errObservationStopped, leaseID, serviceName)
 	}
 
 	var selectedExpose crd.ManifestServiceExpose
@@ -221,7 +222,7 @@ func (op *hostnameOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes
 			continue
 		}
 
-		if ev.GetExternalPort() == uint32(util.ExposeExternalPort(manifest.ServiceExpose{
+		if externalPort == uint32(util.ExposeExternalPort(manifest.ServiceExpose{
 			Port:         expose.Port,
 			ExternalPort: expose.ExternalPort,
 		})) {
@@ -231,7 +232,17 @@ func (op *hostnameOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes
 	}
 
 	if selectedExpose.Port == 0 {
-		return fmt.Errorf("%w: no service expose found for %v - %v - %v", errObservationStopped, ev.GetLeaseID(), ev.GetServiceName(), ev.GetExternalPort())
+		return crd.ManifestServiceExpose{}, fmt.Errorf("%w: no service expose found for %v - %v - %v", errObservationStopped, leaseID, serviceName, externalPort)
+
+	}
+
+	return selectedExpose, nil
+}
+
+func (op *hostnameOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes.HostnameResourceEvent) error {
+	selectedExpose, err := locateServiceFromManifest(ctx, op.client, ev.GetLeaseID(), ev.GetServiceName(), ev.GetExternalPort())
+	if err != nil {
+		return err
 	}
 
 	leaseID := ev.GetLeaseID()

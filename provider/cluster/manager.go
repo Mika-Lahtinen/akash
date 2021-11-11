@@ -300,6 +300,11 @@ func (dm *deploymentManager) startTeardown() <-chan error {
 	return dm.do(dm.doTeardown)
 }
 
+type serviceExposeWithServiceName struct {
+	expose manifest.ServiceExpose
+	name string
+}
+
 func (dm *deploymentManager) doDeploy() ([]string, error) {
 	var err error
 
@@ -358,7 +363,7 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 		blockedHostnames[hostname] = struct{}{}
 	}
 	hosts := make(map[string]manifest.ServiceExpose)
-	leasedIPs := make([]manifest.ServiceExpose, 0)
+	leasedIPs := make([]serviceExposeWithServiceName, 0)
 	hostToServiceName := make(map[string]string)
 
 	// clear this out so it gets repopulated
@@ -384,8 +389,9 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 				}
 			}
 
-			if len(expose.IP) != 0 {
-				leasedIPs = append(leasedIPs, expose)
+
+			if expose.Global && len(expose.IP) != 0 {
+				leasedIPs = append(leasedIPs, serviceExposeWithServiceName{expose:expose, name: service.Name})
 			}
 		}
 	}
@@ -407,7 +413,7 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 		}
 	}
 
-	allocatedIPs := make(map[string][]manifest.ServiceExpose)
+	allocatedIPs := make(map[string][]serviceExposeWithServiceName)
 	makeIPSharingLKey := func(lID mtypes.LeaseID, name string) string {
 		allowedRegex := regexp.MustCompile(`[a-z,0-9,\-]+`)
 		effectiveName := name
@@ -416,6 +422,7 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 			_, err = io.WriteString(h, name)
 			if err != nil {
 				panic(err)
+
 			}
 			effectiveName = strings.ToLower(base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(h.Sum(nil)[0:15]))
 		}
@@ -423,10 +430,8 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 	}
 
 	for _, serviceExpose := range leasedIPs {
-		endpointName := serviceExpose.IP
-
+		endpointName := serviceExpose.expose.IP
 		k := makeIPSharingLKey(dm.lease, endpointName)
-
 		serviceExposeList := allocatedIPs[k]
 		serviceExposeList = append(serviceExposeList, serviceExpose)
 		allocatedIPs[k] = serviceExposeList
@@ -434,8 +439,14 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 
 	for sharingKey, allocatedIP := range allocatedIPs {
 		for _, serviceExpose := range allocatedIP {
-			externalPort := clusterutil.ExposeExternalPort(serviceExpose)
-			err = dm.client.DeclareIP(ctx, dm.lease, serviceExpose.Service, uint32(externalPort), serviceExpose.Proto, sharingKey)
+
+			externalPort := clusterutil.ExposeExternalPort(serviceExpose.expose)
+			err = dm.client.DeclareIP(ctx, dm.lease, serviceExpose.name, uint32(externalPort), serviceExpose.expose.Proto, sharingKey)
+
+			if err != nil {
+				return withheldHostnames, err
+			}
+
 		}
 	}
 	return withheldHostnames, nil
@@ -467,7 +478,7 @@ func (dm *deploymentManager) doTeardown() error {
 	result = retry.Do(func() error {
 		err := dm.client.PurgeDeclaredHostnames(ctx, dm.lease)
 		if err != nil {
-			dm.log.Error("lease teardown failed", "err", err)
+			dm.log.Error("purge declared hostname failure", "err", err)
 		}
 		return err
 	},
@@ -476,7 +487,20 @@ func (dm *deploymentManager) doTeardown() error {
 		retry.MaxDelay(3000*time.Millisecond),
 		retry.DelayType(retry.BackOffDelay),
 		retry.LastErrorOnly(true))
+	// TODO - counter
 
+	result = retry.Do(func() error {
+		err := dm.client.PurgeDeclaredIPs(ctx, dm.lease)
+		if err != nil {
+			dm.log.Error("purge declared ips failure", "err", err)
+		}
+		return err
+	},
+		retry.Attempts(50),
+		retry.Delay(100*time.Millisecond),
+		retry.MaxDelay(3000*time.Millisecond),
+		retry.DelayType(retry.BackOffDelay),
+		retry.LastErrorOnly(true))
 	// TODO - counter
 	return result
 }
