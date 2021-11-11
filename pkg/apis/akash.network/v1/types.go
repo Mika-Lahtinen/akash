@@ -475,4 +475,5 @@ type ProviderLeasedIPSpec struct {
 	ServiceName  string `json:"service_name"`
 	ExternalPort uint32 `json:"external_port"`
 	SharingKey   string `json:"sharing_key"`
+	Protocol string `json:"protocol"`
 }
