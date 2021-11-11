@@ -424,6 +424,8 @@ func (sdl *v2) validate() error {
 			return fmt.Errorf("%w: endpoint named %q has no kind", errSDLInvalid, endpointName)
 		}
 	}
+
+	// TODO - check for endpoints declared but not used
 	portsUsed := make(map[string]string)
 	for _, svcName := range v2DeploymentSvcNames(sdl.Deployments) {
 		depl := sdl.Deployments[svcName]
@@ -454,7 +456,7 @@ func (sdl *v2) validate() error {
 				for _, to := range serviceExpose.To {
 					// Check to see if an IP endpoint is also specified
 					if len(to.IP) != 0 {
-						if to.Global {
+						if !to.Global {
 							return fmt.Errorf("%w: error on %q if an IP is declared the directive must be declared as global", errSDLInvalid, svcName)
 						}
 						endpoint, endpointExists := sdl.Endpoints[to.IP]
