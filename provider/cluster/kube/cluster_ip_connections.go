@@ -51,6 +51,7 @@ func (c *client) DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName 
 			ServiceName:  serviceName,
 			ExternalPort: externalPort,
 			SharingKey:   sharingKey,
+			Protocol: proto.ToString(),
 		},
 		Status: akashtypes.ProviderLeasedIPStatus{},
 	}
