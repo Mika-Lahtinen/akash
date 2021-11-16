@@ -43,7 +43,7 @@ func ipResourceName(leaseID mtypes.LeaseID, serviceName string, externalPort uin
 func (c *client) PurgeDeclaredIP(ctx context.Context, leaseID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol) error {
 	resourceName := ipResourceName(leaseID, serviceName, externalPort, proto)
 	return c.ac.AkashV1().ProviderLeasedIPs(c.ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%=s=true", builder.AkashManagedLabelName),
+		LabelSelector: fmt.Sprintf("%s=true", builder.AkashManagedLabelName),
 		FieldSelector: fmt.Sprintf("metadata.name=%s", resourceName),
 	})
 }
@@ -116,7 +116,7 @@ func (c *client) GetIPPassthroughs(ctx context.Context) ([]ctypes.IPPassthrough,
 
 	labelSelector := &strings.Builder{}
 
-	_, err := fmt.Fprintf(labelSelector, "%=true", builder.AkashManagedLabelName)
+	_, err := fmt.Fprintf(labelSelector, "%s=true", builder.AkashManagedLabelName)
 	if err != nil {
 		return nil, err
 	}

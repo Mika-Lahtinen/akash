@@ -187,6 +187,29 @@ func (_m *Client) GetHostnameDeploymentConnections(ctx context.Context) ([]clust
 	return r0, r1
 }
 
+// GetIPPassthroughs provides a mock function with given fields: ctx
+func (_m *Client) GetIPPassthroughs(ctx context.Context) ([]cluster.IPPassthrough, error) {
+	ret := _m.Called(ctx)
+
+	var r0 []cluster.IPPassthrough
+	if rf, ok := ret.Get(0).(func(context.Context) []cluster.IPPassthrough); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]cluster.IPPassthrough)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetManifestGroup provides a mock function with given fields: _a0, _a1
 func (_m *Client) GetManifestGroup(_a0 context.Context, _a1 v1beta2.LeaseID) (bool, v1.ManifestGroup, error) {
 	ret := _m.Called(_a0, _a1)
@@ -381,6 +404,20 @@ func (_m *Client) PurgeDeclaredHostnames(ctx context.Context, lID v1beta2.LeaseI
 	return r0
 }
 
+// PurgeDeclaredIP provides a mock function with given fields: ctx, lID, serviceName, externalPort, proto
+func (_m *Client) PurgeDeclaredIP(ctx context.Context, lID v1beta2.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol) error {
+	ret := _m.Called(ctx, lID, serviceName, externalPort, proto)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, v1beta2.LeaseID, string, uint32, manifest.ServiceProtocol) error); ok {
+		r0 = rf(ctx, lID, serviceName, externalPort, proto)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // PurgeDeclaredIPs provides a mock function with given fields: ctx, lID
 func (_m *Client) PurgeDeclaredIPs(ctx context.Context, lID v1beta2.LeaseID) error {
 	ret := _m.Called(ctx, lID)
@@ -395,13 +432,13 @@ func (_m *Client) PurgeDeclaredIPs(ctx context.Context, lID v1beta2.LeaseID) err
 	return r0
 }
 
-// PurgeIPPassthrough provides a mock function with given fields: ctx, lID, serviceName, externalPort
-func (_m *Client) PurgeIPPassthrough(ctx context.Context, lID v1beta2.LeaseID, serviceName string, externalPort uint32) error {
-	ret := _m.Called(ctx, lID, serviceName, externalPort)
+// PurgeIPPassthrough provides a mock function with given fields: ctx, lID, directive
+func (_m *Client) PurgeIPPassthrough(ctx context.Context, lID v1beta2.LeaseID, directive cluster.ClusterIPPassthroughDirective) error {
+	ret := _m.Called(ctx, lID, directive)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, v1beta2.LeaseID, string, uint32) error); ok {
-		r0 = rf(ctx, lID, serviceName, externalPort)
+	if rf, ok := ret.Get(0).(func(context.Context, v1beta2.LeaseID, cluster.ClusterIPPassthroughDirective) error); ok {
+		r0 = rf(ctx, lID, directive)
 	} else {
 		r0 = ret.Error(0)
 	}
