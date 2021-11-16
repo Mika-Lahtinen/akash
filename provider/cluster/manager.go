@@ -67,6 +67,7 @@ type deploymentManager struct {
 	updatech         chan *manifest.Group
 	teardownch       chan struct{}
 	currentHostnames map[string]struct{}
+	currentIPs	map[string]serviceExposeWithServiceName
 
 	log             log.Logger
 	lc              lifecycle.Lifecycle
@@ -96,6 +97,7 @@ func newDeploymentManager(s *service, lease mtypes.LeaseID, mgroup *manifest.Gro
 		config:              s.config,
 		serviceShuttingDown: s.lc.ShuttingDown(),
 		currentHostnames:    make(map[string]struct{}),
+		currentIPs: make(map[string]serviceExposeWithServiceName),
 	}
 
 	go dm.lc.WatchChannel(dm.serviceShuttingDown)
@@ -305,6 +307,10 @@ type serviceExposeWithServiceName struct {
 	name string
 }
 
+func (sewsn serviceExposeWithServiceName) idIP() string {
+	return fmt.Sprintf("%s-%s-%d", sewsn.name, sewsn.expose.IP, sewsn.expose.Port, sewsn.expose.Proto)
+}
+
 func (dm *deploymentManager) doDeploy() ([]string, error) {
 	var err error
 
@@ -365,7 +371,7 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 	hosts := make(map[string]manifest.ServiceExpose)
 	leasedIPs := make([]serviceExposeWithServiceName, 0)
 	hostToServiceName := make(map[string]string)
-
+	ipsInThisRequest := make(map[string]serviceExposeWithServiceName)
 	// clear this out so it gets repopulated
 	dm.currentHostnames = make(map[string]struct{})
 	// Iterate over each entry, extracting the ingress services & leased IPs
@@ -389,10 +395,20 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 				}
 			}
 
-
 			if expose.Global && len(expose.IP) != 0 {
-				leasedIPs = append(leasedIPs, serviceExposeWithServiceName{expose:expose, name: service.Name})
+				v := serviceExposeWithServiceName{expose:expose, name: service.Name}
+				leasedIPs = append(leasedIPs, v)
+				ipsInThisRequest[v.idIP()] = v
 			}
+		}
+	}
+
+	purgeIPs := make([]serviceExposeWithServiceName, 0)
+	for currentIP := range dm.currentIPs {
+		_, stillInUse := ipsInThisRequest[currentIP]
+		if !stillInUse {
+			v := dm.currentIPs[currentIP]
+			purgeIPs = append(purgeIPs, v)
 		}
 	}
 
@@ -405,7 +421,6 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 		}
 	}
 	// TODO - counter
-
 	for _, hostname := range purgeHostnames {
 		err = dm.client.PurgeDeclaredHostname(ctx, dm.lease, hostname)
 		if err != nil {
@@ -436,7 +451,14 @@ func (dm *deploymentManager) doDeploy() ([]string, error) {
 		err = dm.client.DeclareIP(ctx, dm.lease, serviceExpose.name, uint32(externalPort), serviceExpose.expose.Proto, sharingKey)
 
 		if err != nil {
-			// TODO - on error undeclare IPs
+			// TODO - on error undeclare IPs -- ?? actually needed or not
+			return withheldHostnames, err
+		}
+		dm.currentIPs[serviceExpose.idIP()] = serviceExpose
+	}
+	for  _, serviceExpose := range purgeIPs {
+		err = dm.client.PurgeDeclaredIP(ctx, dm.lease, serviceExpose.name, uint32(serviceExpose.expose.Port), serviceExpose.expose.Proto)
+		if err != nil {
 			return withheldHostnames, err
 		}
 	}

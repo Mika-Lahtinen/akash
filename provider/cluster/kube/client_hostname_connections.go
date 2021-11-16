@@ -88,12 +88,10 @@ func (c *client) PurgeDeclaredHostname(ctx context.Context, lID mtypes.LeaseID, 
 	labelSelector := &strings.Builder{}
 	kubeSelectorForLease(labelSelector, lID)
 
-	result := c.ac.AkashV1().ProviderHosts(c.ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
+	return c.ac.AkashV1().ProviderHosts(c.ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
 		FieldSelector: fmt.Sprintf("metadata.name=%s", hostname),
 	})
-
-	return result
 }
 
 func (c *client) PurgeDeclaredHostnames(ctx context.Context, lID mtypes.LeaseID) error {

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/ovrclk/akash/manifest"
 	mtypes "github.com/ovrclk/akash/x/market/types/v1beta2"
 )
 
@@ -22,4 +23,5 @@ type ClusterIPPassthroughDirective struct {
 	ServiceName string
 	ServicePort uint32
 	SharingKey string
+	Protocol manifest.ServiceProtocol
 }

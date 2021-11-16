@@ -64,7 +64,7 @@ func (op *ipOperator) monitorUntilError(parentCtx context.Context) error {
 	op.log.Info("starting observation")
 
 	/**
-	ipServices, err := op.client.GetIPState(ctx)
+	ipServices, err := op.client.CreateIPPassthrough(ctx)
 	if err != nil {
 		cancel()
 		return err
@@ -123,17 +123,16 @@ func (op *ipOperator) applyEvent(ctx context.Context, ev ctypes.IPResourceEvent)
 }
 
 func (op *ipOperator) applyDeleteEvent(ctx context.Context, ev ctypes.IPResourceEvent) error {
-	return nil
-	/*
-	leaseID := ev.GetLeaseID()
-	err := op.client.RemoveHostnameFromDeployment(ctx, ev.GetHostname(), leaseID, true)
+	directive := buildIPDirective(ev)
+	err := op.client.PurgeIPPassthrough(ctx, ev.GetLeaseID(), directive)
 
 	if err == nil {
-		delete(op.hostnames, ev.GetHostname())
+		uid := getStateKey(ev)
+		delete(op.state, uid)
 	}
 
 	return err
-	 */
+
 }
 
 func buildIPDirective(ev ctypes.IPResourceEvent) ctypes.ClusterIPPassthroughDirective {
@@ -142,14 +141,19 @@ func buildIPDirective(ev ctypes.IPResourceEvent) ctypes.ClusterIPPassthroughDire
 		ServiceName: ev.GetServiceName(),
 		ServicePort: ev.GetExternalPort(),
 		SharingKey:  ev.GetSharingKey(),
+		Protocol:  ev.GetProtocol(),
 	}
 
+}
+
+func getStateKey(ev ctypes.IPResourceEvent) string{
+	return fmt.Sprintf("%s-%d", ev.GetSharingKey(), ev.GetExternalPort())
 }
 
 func (op *ipOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes.IPResourceEvent) error {
 	leaseID := ev.GetLeaseID()
 
-	uid := fmt.Sprintf("%s-%d", ev.GetSharingKey(), ev.GetExternalPort())
+	uid := getStateKey(ev)
 
 	op.log.Debug("connecting",
 		"lease", leaseID,
@@ -186,14 +190,14 @@ func (op *ipOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes.IPRes
 	} else {
 		op.log.Debug("Swapping ip passthrough to new deployment")
 
-		err = op.client.PurgeIPPassthrough(ctx, leaseID, ev.GetServiceName(), ev.GetExternalPort())
+		err = op.client.PurgeIPPassthrough(ctx, leaseID, directive)
 
 		if err == nil {
 			err = op.client.CreateIPPassthrough(ctx, leaseID, directive)
 		}
 	}
 
-	if err == nil { // Update sored entry if everything went OK
+	if err == nil { // Update stored entry if everything went OK
 		entry.presentServiceName = ev.GetServiceName()
 		entry.presentLease = leaseID
 		entry.lastEvent = ev

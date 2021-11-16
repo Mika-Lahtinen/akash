@@ -3,16 +3,16 @@ package kube
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
-	"github.com/ovrclk/akash/manifest"
 	sdktypes "github.com/cosmos/cosmos-sdk/types"
+	"github.com/ovrclk/akash/manifest"
 	akashtypes "github.com/ovrclk/akash/pkg/apis/akash.network/v1"
 	"github.com/ovrclk/akash/provider/cluster/kube/builder"
 	ctypes "github.com/ovrclk/akash/provider/cluster/types"
 	mtypes "github.com/ovrclk/akash/x/market/types/v1beta2"
 	"io"
 	corev1 "k8s.io/api/core/v1"
+
 	kubeErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -22,14 +22,34 @@ import (
 	"strings"
 )
 
-func (c *client) DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error {
+const (
+	akashServiceTarget = "akash.network/service-target"
+	akashMetalLB = "metal-lb"
+	metalLbAllowSharedIp = "metallb.universe.tf/allow-shared-ip"
+)
+
+func ipResourceName(leaseID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol) string {
 	h := sha256.New()
-	_, err := io.WriteString(h, lID.String())
+	_, err := io.WriteString(h, leaseID.String())
 	if err != nil {
-		return err
+		panic(err)
 	}
 	leaseIDHash := h.Sum(nil)
-	resourceName := fmt.Sprintf("%x-%s-%d", leaseIDHash, serviceName, externalPort)
+	resourceName := fmt.Sprintf("%x-%s-%d-%s", leaseIDHash, serviceName, externalPort, proto)
+
+	return resourceName
+}
+
+func (c *client) PurgeDeclaredIP(ctx context.Context, leaseID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol) error {
+	resourceName := ipResourceName(leaseID, serviceName, externalPort, proto)
+	return c.ac.AkashV1().ProviderLeasedIPs(c.ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%=s=true", builder.AkashManagedLabelName),
+		FieldSelector: fmt.Sprintf("metadata.name=%s", resourceName),
+	})
+}
+
+func (c *client) DeclareIP(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32, proto manifest.ServiceProtocol, sharingKey string) error {
+	resourceName := ipResourceName(lID, serviceName, externalPort, proto)
 
 	labels := map[string]string{
 		builder.AkashManagedLabelName: "true",
@@ -87,6 +107,85 @@ func (c *client) PurgeDeclaredIPs(ctx context.Context, lID mtypes.LeaseID) error
 	return result
 }
 
+func (c *client) GetIPPassthroughs(ctx context.Context) ([]ctypes.IPPassthrough, error) {
+
+
+	servicePager := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error){
+		return c.kc.CoreV1().Services(metav1.NamespaceAll).List(ctx, opts)
+	})
+
+	labelSelector := &strings.Builder{}
+
+	_, err := fmt.Fprintf(labelSelector, "%=true", builder.AkashManagedLabelName)
+	if err != nil {
+		return nil, err
+	}
+	_, err = fmt.Fprintf(labelSelector, ",%s%s", akashServiceTarget, akashMetalLB)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ctypes.IPPassthrough, 0)
+	err = servicePager.EachListItem(ctx,
+		metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=true", builder.AkashManagedLabelName),
+		},
+		func(obj runtime.Object) error {
+			service := obj.(*corev1.Service)
+
+			if service.Spec.Type != corev1.ServiceTypeLoadBalancer {
+				return fmt.Errorf("resource %q wrong type in service definition %v", service.ObjectMeta.Name, service.Spec.Type)
+			}
+
+
+			ports := service.Spec.Ports
+			const expectedNumberOfPorts = 1
+			if len(ports) != expectedNumberOfPorts {
+				return fmt.Errorf("resource %q  wrong number of ports in load balancer service definition. expected %d, got %d", service.ObjectMeta.Name, expectedNumberOfPorts, len(ports))
+			}
+
+			portDefn := ports[0]
+			proto := portDefn.Protocol
+			port := portDefn.Port
+
+			mproto, err := manifest.ServiceProtocolFromString(string(proto))
+			if err != nil {
+				return err // TODO include resource name
+			}
+
+			leaseID, err := recoverLeaseIdFromLabels(service.Labels)
+			if err != nil {
+				return err // TODO include resource name
+			}
+
+
+			serviceSelector := service.Spec.Selector
+			serviceName := serviceSelector[builder.AkashManifestServiceLabelName]
+			if len(serviceName) == 0 {
+				return fmt.Errorf("service name cannot be empty")
+			}
+
+			sharingKey := service.ObjectMeta.Annotations[metalLbAllowSharedIp]
+
+			v := ipResourceEvent{
+				lID:          leaseID,
+				eventType:    "", // unused
+				serviceName:  serviceName,
+				externalPort: uint32(port),
+				sharingKey:   sharingKey,
+				providerAddr: nil, // unused
+				ownerAddr:    nil, // unused
+				protocol:     mproto,
+			}
+
+			result = append(result, v)
+			return nil
+		})
+
+
+	return result, err
+}
+
 func (c *client) ObserveIPState(ctx context.Context) (<-chan ctypes.IPResourceEvent, error) {
 	var lastResourceVersion string
 	phpager := pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
@@ -142,6 +241,11 @@ func (c *client) ObserveIPState(ctx context.Context) (<-chan ctypes.IPResourceEv
 			return nil, err
 		}
 
+		proto, err := manifest.ServiceProtocolFromString(v.Spec.Protocol)
+		if err != nil {
+			return nil, err
+		}
+
 		ev := ipResourceEvent{
 			eventType:    ctypes.ProviderResourceAdd,
 			lID: leaseID,
@@ -150,6 +254,7 @@ func (c *client) ObserveIPState(ctx context.Context) (<-chan ctypes.IPResourceEv
 			ownerAddr: ownerAddr,
 			providerAddr: providerAddr,
 			sharingKey: v.Spec.SharingKey,
+			protocol: proto,
 		}
 		evData[i] = ev
 	}
@@ -188,12 +293,20 @@ func (c *client) ObserveIPState(ctx context.Context) (<-chan ctypes.IPResourceEv
 			    	c.log.Error("invalid lease ID", "err", err)
 					continue // Ignore event
 				}
+				proto, err := manifest.ServiceProtocolFromString(plip.Spec.Protocol)
+				if err != nil {
+					c.log.Error("invalid protocol", "err", err)
+					continue
+				}
+
 				ev := ipResourceEvent{
-					lID: leaseID,
-					ownerAddr:        ownerAddr,
-					providerAddr:     providerAddr,
+					lID:          leaseID,
 					serviceName:  plip.Spec.ServiceName,
 					externalPort: plip.Spec.ExternalPort,
+					sharingKey:   plip.Spec.SharingKey,
+					providerAddr: providerAddr,
+					ownerAddr:    ownerAddr,
+					protocol:     proto,
 				}
 				switch result.Type {
 
@@ -231,6 +344,7 @@ type ipResourceEvent struct {
 	sharingKey string
 	providerAddr sdktypes.Address
 	ownerAddr sdktypes.Address
+	protocol manifest.ServiceProtocol
 }
 
 func (ev ipResourceEvent) GetLeaseID() mtypes.LeaseID {
@@ -254,11 +368,32 @@ func (ev ipResourceEvent) GetSharingKey() string {
 	return ev.sharingKey
 }
 
-func (c *client) CreateIPPassthrough(ctx context.Context, lID mtypes.LeaseID, directive ctypes.ClusterIPPassthroughDirective) error {
+func (ev ipResourceEvent) GetProtocol() manifest.ServiceProtocol {
+	return ev.protocol
+}
 
-	ns := builder.LidNS(lID)
+func (c *client) PurgeIPPassthrough(ctx context.Context, leaseID mtypes.LeaseID, directive ctypes.ClusterIPPassthroughDirective) error {
+	ns := builder.LidNS(leaseID)
+	portName := createIPPassthroughResourceName(directive)
+
+	err := c.kc.CoreV1().Services(ns).Delete(ctx, portName, metav1.DeleteOptions{})
+
+	if err != nil && kubeErrors.IsNotFound(err) {
+		return nil
+	}
+
+	return err
+}
+
+func createIPPassthroughResourceName(directive ctypes.ClusterIPPassthroughDirective) string{
+	return strings.ToLower(fmt.Sprintf("%s-%d-%v", directive.ServiceName, directive.ServicePort, directive.Protocol))
+}
+
+func (c *client) CreateIPPassthrough(ctx context.Context, leaseID mtypes.LeaseID, directive ctypes.ClusterIPPassthroughDirective) error {
+	ns := builder.LidNS(leaseID)
 	labels := make(map[string]string)
-	builder.AppendLeaseLabels(lID, labels)
+	builder.AppendLeaseLabels(leaseID, labels)
+	labels[akashServiceTarget] = akashMetalLB
 
 	selector := map[string]string {
 		builder.AkashManagedLabelName: "true",
@@ -266,50 +401,52 @@ func (c *client) CreateIPPassthrough(ctx context.Context, lID mtypes.LeaseID, di
 	}
 	// TODO - specify metallb.universe.tf/address-pool annotation if configured to do so only that pool is used at any time
 	annotations := map[string]string {
-		"metallb.universe.tf/allow-shared-ip": directive.SharingKey,
+		metalLbAllowSharedIp: directive.SharingKey,
 	}
 
-	for _, proto := range []corev1.Protocol{
-		corev1.ProtocolTCP,
-	    corev1.ProtocolUDP, } {
+	var proto corev1.Protocol
 
-		portName := strings.ToLower(fmt.Sprintf("%s-%d-%v", directive.ServiceName, directive.ServicePort, proto))
-
-
-		port := corev1.ServicePort{
-			Name:        portName,
-			Protocol:    proto,
-			Port:        int32(directive.ServicePort),
-			TargetPort:  intstr.FromInt(int(directive.ServicePort)),
-		}
-
-		svc := corev1.Service{
-
-			ObjectMeta: metav1.ObjectMeta{
-				Name:                       portName,
-				Labels: labels,
-				Annotations: annotations,
-			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					port,
-				},
-				Selector:                      selector,
-				Type:                          corev1.ServiceTypeLoadBalancer,
-			},
-			Status: corev1.ServiceStatus{},
-		}
-
-		// TODO - change this to be create or update logic
-		_, err := c.kc.CoreV1().Services(ns).Create(ctx, &svc, metav1.CreateOptions{})
-		// TODO - handle if some services were already created and this fails
-		if err != nil {
-			return err
-		}
+	switch(directive.Protocol) {
+		case manifest.TCP:
+			proto = corev1.ProtocolTCP
+		case manifest.UDP:
+			proto = corev1.ProtocolUDP
+		default:
+			return fmt.Errorf("%w unknown protocol %v", ErrInternalError, directive.Protocol)
 	}
+
+	portName := createIPPassthroughResourceName(directive)
+
+	port := corev1.ServicePort{
+		Name:        portName,
+		Protocol:    proto,
+		Port:        int32(directive.ServicePort),
+		TargetPort:  intstr.FromInt(int(directive.ServicePort)),
+	}
+
+	svc := corev1.Service{
+
+		ObjectMeta: metav1.ObjectMeta{
+			Name:                       portName,
+			Labels: labels,
+			Annotations: annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				port,
+			},
+			Selector:                      selector,
+			Type:                          corev1.ServiceTypeLoadBalancer,
+		},
+		Status: corev1.ServiceStatus{},
+	}
+
+	// TODO - change this to be create or update logic
+	_, err := c.kc.CoreV1().Services(ns).Create(ctx, &svc, metav1.CreateOptions{})
+	// TODO - handle if some services were already created and this fails
+	if err != nil {
+		return err
+	}
+
 	return nil
-}
-
-func (c *client) PurgeIPPassthrough(ctx context.Context, lID mtypes.LeaseID, serviceName string, externalPort uint32) error {
-	return errors.New("nope")
 }
