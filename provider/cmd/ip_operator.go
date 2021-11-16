@@ -30,50 +30,26 @@ type ipOperator struct {
 	log log.Logger
 }
 
-func (op *ipOperator) run(parentCtx context.Context) error {
-	op.log.Debug("ip operator start")
-	const threshold = 3 * time.Second
-
-	for {
-		lastAttempt := time.Now()
-		err := op.monitorUntilError(parentCtx)
-		if errors.Is(err, context.Canceled) {
-			op.log.Debug("ip operator terminate")
-			return err
-		}
-
-		op.log.Error("observation stopped", "err", err)
-
-		// don't spin if there is a condition causing fast failure
-		elapsed := time.Since(lastAttempt)
-		if elapsed < threshold {
-			op.log.Info("delaying")
-			select {
-			case <-parentCtx.Done():
-				return parentCtx.Err()
-			case <-time.After(threshold):
-				// delay complete
-			}
-		}
-	}
-}
-
-
 func (op *ipOperator) monitorUntilError(parentCtx context.Context) error {
 	ctx, cancel := context.WithCancel(parentCtx)
 	op.log.Info("starting observation")
 
-	/**
-	ipServices, err := op.client.CreateIPPassthrough(ctx)
+	op.state = make(map[string]managedIp)
+
+	entries, err := op.client.GetIPPassthroughs(ctx)
 	if err != nil {
 		cancel()
 		return err
 	}
 
-	for _, conn := range ipServices {
-		// TODO - update op.state with each entry
+	for _, ipPassThrough := range entries {
+		k := getStateKey(ipPassThrough.GetLeaseID(), ipPassThrough.GetSharingKey(), ipPassThrough.GetExternalPort())
+		op.state[k] = managedIp{
+			presentLease:       ipPassThrough.GetLeaseID(),
+			presentServiceName: ipPassThrough.GetSharingKey(),
+			lastEvent:          nil,
+		}
 	}
-	 */
 
 	events, err := op.client.ObserveIPState(ctx)
 	if err != nil {
@@ -127,12 +103,11 @@ func (op *ipOperator) applyDeleteEvent(ctx context.Context, ev ctypes.IPResource
 	err := op.client.PurgeIPPassthrough(ctx, ev.GetLeaseID(), directive)
 
 	if err == nil {
-		uid := getStateKey(ev)
+		uid := getStateKeyFromEvent(ev)
 		delete(op.state, uid)
 	}
 
 	return err
-
 }
 
 func buildIPDirective(ev ctypes.IPResourceEvent) ctypes.ClusterIPPassthroughDirective {
@@ -143,17 +118,20 @@ func buildIPDirective(ev ctypes.IPResourceEvent) ctypes.ClusterIPPassthroughDire
 		SharingKey:  ev.GetSharingKey(),
 		Protocol:  ev.GetProtocol(),
 	}
-
 }
 
-func getStateKey(ev ctypes.IPResourceEvent) string{
-	return fmt.Sprintf("%s-%d", ev.GetSharingKey(), ev.GetExternalPort())
+func getStateKey(leaseID mtypes.LeaseID, sharingKey string, externalPort uint32) string {
+	return fmt.Sprintf("%v-%s-%d", leaseID, sharingKey, externalPort)
+}
+
+func getStateKeyFromEvent(ev ctypes.IPResourceEvent) string{
+	return getStateKey(ev.GetLeaseID(), ev.GetSharingKey(), ev.GetExternalPort())
 }
 
 func (op *ipOperator) applyAddOrUpdateEvent(ctx context.Context, ev ctypes.IPResourceEvent) error {
 	leaseID := ev.GetLeaseID()
 
-	uid := getStateKey(ev)
+	uid := getStateKeyFromEvent(ev)
 
 	op.log.Debug("connecting",
 		"lease", leaseID,
@@ -218,11 +196,12 @@ func doIPOperator(cmd *cobra.Command) error {
 		return err
 	}
 
-	op := ipOperator{
+	op := &ipOperator{
 		state:  make(map[string]managedIp),
 		client: client,
 		log:    logger,
 	}
+
 
 
 	return op.run(cmd.Context())
@@ -246,3 +225,29 @@ func IPOperatorCmd() *cobra.Command {
 	return cmd
 }
 
+func (op *ipOperator) run(parentCtx context.Context) error {
+	op.log.Debug("ip operator start")
+	const threshold = 3 * time.Second
+	for {
+		lastAttempt := time.Now()
+		err := op.monitorUntilError(parentCtx)
+		if errors.Is(err, context.Canceled) {
+			op.log.Debug("ip operator terminate")
+			return err
+		}
+
+		op.log.Error("observation stopped", "err", err)
+
+		// don't spin if there is a condition causing fast failure
+		elapsed := time.Since(lastAttempt)
+		if elapsed < threshold {
+			op.log.Info("delaying")
+			select {
+			case <-parentCtx.Done():
+				return parentCtx.Err()
+			case <-time.After(threshold):
+				// delay complete
+			}
+		}
+	}
+}

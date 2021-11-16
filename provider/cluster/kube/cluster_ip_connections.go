@@ -120,18 +120,24 @@ func (c *client) GetIPPassthroughs(ctx context.Context) ([]ctypes.IPPassthrough,
 	if err != nil {
 		return nil, err
 	}
-	_, err = fmt.Fprintf(labelSelector, ",%s%s", akashServiceTarget, akashMetalLB)
+	_, err = fmt.Fprintf(labelSelector, ",%s=%s", akashServiceTarget, akashMetalLB)
 	if err != nil {
 		return nil, err
 	}
-
+	
 	result := make([]ctypes.IPPassthrough, 0)
 	err = servicePager.EachListItem(ctx,
 		metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=true", builder.AkashManagedLabelName),
+			LabelSelector: labelSelector.String(),
 		},
 		func(obj runtime.Object) error {
 			service := obj.(*corev1.Service)
+
+			_, hasOwner := service.ObjectMeta.Labels[builder.AkashLeaseOwnerLabelName]
+			if !hasOwner {
+				// Not a service related to a running deployment
+				return nil
+			}
 
 			if service.Spec.Type != corev1.ServiceTypeLoadBalancer {
 				return fmt.Errorf("resource %q wrong type in service definition %v", service.ObjectMeta.Name, service.Spec.Type)

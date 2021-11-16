@@ -70,6 +70,7 @@ func (op *hostnameOperator) monitorUntilError(parentCtx context.Context) error {
 		avoid trying to create Ingress objects with those names. This isn't really
 		needed at this time.
 	*/
+	op.hostnames = make(map[string]managedHostname)
 	ctx, cancel := context.WithCancel(parentCtx)
 	op.log.Info("starting observation")
 
